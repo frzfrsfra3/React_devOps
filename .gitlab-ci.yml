@@ -1,0 +1,46 @@
+stages:
+  - deploy
+  - production
+cache:
+ paths:
+    - node_modules
+deploy:
+   image: docker:dind
+   stage: deploy
+   script:
+     - docker build -t app/blog -f Dockerfile3 .
+  #   - docker rm container $(docker ps -qa --no-trunc --filter "expose=3000/tcp") 2> d.log
+  #   - docker rm $(docker ps -qa --no-trunc --filter "expose=3000/tcp")
+     - docker stop newtest || docker rm newtest  || echo "newtest containter is already stop"
+     - docker run -d -p 3000:3000 --rm --name newtest app/blog
+     - docker cp newtest:/app ./app
+     - pwd
+   tags:
+     - docker
+   only:
+     - master
+production:
+   stage: production
+   script:
+     - git config git-ftp.url "ftp://zaiter.its.ae:21/public_html/next"
+     - git config git-ftp.user "zaiterits"
+     - git config git-ftp.password "Password"
+     - ls
+# Upload all files
+    
+   # - git ftp init
+
+# Or if the files are already there
+     - git ftp catchup
+     - docker cp newtest:/app ./app
+# Work and deploy 
+     - echo "new content" >> index.txt
+   # - git commit index.txt -m "Add new content"
+     - git ftp push
+     - cd ./app &&  lftp -e "set ssl:check-hostname no; mirror -vvv -R . ./public_html/next6 --parallel=20 --exclude-glob .git* --exclude .git/ ; quit" -u zaiterits,password zaiter.its.ae
+    
+
+   tags:
+     - docker
+   only:
+     - master
